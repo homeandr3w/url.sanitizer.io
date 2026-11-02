@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL SANITIZER // TERMINAL_v2.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Fira Code', monospace; }
+        body { background-color: #030503; color: #00ff41; overflow-x: hidden; }
+        .crt-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            background-size: 100% 4px; z-index: 20; pointer-events: none; opacity: 0.6;
+        }
+        .matrix-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.18; pointer-events: none; }
+        .glow-box { box-shadow: 0 0 15px rgba(0, 255, 65, 0.2); border: 1px solid #00ff41; }
+        .glow-box:focus-within { box-shadow: 0 0 25px rgba(0, 255, 65, 0.5); }
+        .glow-text { text-shadow: 0 0 8px rgba(0, 255, 65, 0.7); }
+        .glow-button { box-shadow: 0 0 10px rgba(0, 255, 65, 0.3); }
+        .glow-button:hover { box-shadow: 0 0 20px rgba(0, 255, 65, 0.8); background-color: #00ff41; color: #000; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #030503; }
+        ::-webkit-scrollbar-thumb { background: #003b00; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00ff41; }
+    </style>
+</head>
+<body class="min-h-screen relative flex flex-col justify-between p-4 md:p-8">
+
+    <div class="crt-overlay"></div>
+    <canvas id="matrix" class="matrix-bg"></canvas>
+
+    <div class="relative z-10 max-w-4xl mx-auto w-full">
+        <!-- Header -->
+        <header class="mb-8 border-b border-emerald-900/60 pb-4 flex justify-between items-end flex-wrap gap-4">
+            <div>
+                <h1 class="text-2xl md:text-4xl font-bold tracking-widest glow-text flex items-center gap-3">
+                    <span class="animate-pulse">>[_]</span> URL_PURGER // v2.0
+                </h1>
+                <p class="text-xs md:text-sm text-emerald-600 mt-1">ROOT_PRIVILEGES_GRANTED // STRIP_TRACKERS_&_REDIRECTS</p>
+            </div>
+            <div class="text-right text-xs text-emerald-500/80">
+                <span>SYSTEM_STATUS: <span class="text-emerald-400 font-bold">ONLINE</span></span><br>
+                <span>ENGINE: <span class="text-emerald-400">REGEX+NATIVE_DOM</span></span>
+            </div>
+        </header>
+
+        <!-- Main Input Form -->
+        <main class="space-y-6">
+            <div class="glow-box bg-black/80 backdrop-blur p-4 md:p-6 rounded-none">
+                <label for="rawUrl" class="block text-xs uppercase tracking-wider text-emerald-400 mb-2 font-bold">
+                    $ INPUT_DIRTY_URL // [PASTE HERE]
+                </label>
+                <div class="flex flex-col md:flex-row gap-3">
+                    <input type="text" id="rawUrl" placeholder="https://www.google.com/search?q=query&sxsrf=AKL5y..." 
+                           class="flex-1 bg-black border border-emerald-800 text-emerald-300 p-3 rounded-none focus:outline-none focus:border-emerald-400 font-mono text-sm">
+                    <button id="cleanBtn" class="glow-button border border-00ff41 text-emerald-400 px-6 py-3 font-bold transition-all duration-200">
+                        SANITIZE_LINK
+                    </button>
+                </div>
+            </div>
+
+            <!-- Results Output -->
+            <div id="outputContainer" class="hidden glow-box bg-black/90 backdrop-blur p-4 md:p-6 rounded-none space-y-4">
+                <div class="flex justify-between items-center border-b border-emerald-900 pb-2">
+                    <span class="text-xs text-emerald-400 font-bold">$ SANITIZED_RESULT //</span>
+                    <span id="trackerBadge" class="text-xs bg-emerald-950 text-emerald-400 border border-emerald-600 px-2 py-0.5 font-bold">0 TRACKERS REMOVED</span>
+                </div>
+
+                <div>
+                    <input type="text" id="cleanUrl" readonly 
+                           class="w-full bg-emerald-950/40 border border-emerald-500 text-emerald-200 p-3 font-mono text-sm focus:outline-none select-all">
+                </div>
+
+                <div class="flex flex-wrap gap-3">
+                    <button id="copyBtn" class="glow-button border border-emerald-500 text-emerald-400 px-4 py-2 text-xs font-bold transition-all">
+                        COPY_TO_CLIPBOARD
+                    </button>
+                    <a id="openBtn" href="#" target="_blank" class="glow-button border border-emerald-700 text-emerald-500 px-4 py-2 text-xs font-bold transition-all inline-block">
+                        LAUNCH_URL ->
+                    </a>
+                </div>
+
+                <!-- Removed Trackers Log -->
+                <div id="removedLogContainer" class="hidden mt-4 pt-4 border-t border-emerald-950">
+                    <span class="text-xs text-emerald-600 block mb-2">[PURGED_PARAMETERS_LIST]:</span>
+                    <div id="removedLog" class="flex flex-wrap gap-2 text-xs"></div>
+                </div>
+            </div>
+
+            <!-- History Section -->
+            <div class="border border-emerald-900/40 bg-black/60 p-4">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-xs text-emerald-600 font-bold">$ SESSION_LOGS //</span>
+                    <button id="clearHistoryBtn" class="text-xs text-red-500 hover:underline">CLEAR_LOGS</button>
+                </div>
+                <div id="historyList" class="space-y-2 text-xs text-emerald-500/80 max-h-48 overflow-y-auto">
+                    <div class="text-emerald-800 italic">No previous logs stored.</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="relative z-10 text-center text-xs text-emerald-800 mt-8 pt-4 border-t border-emerald-950">
+        URL_SANITIZER_CORE // ZERO_DATA_COLLECTION // LOCAL_DOM_PROCESSING_ONLY
+    </footer>
+
+    <script>
+        // --- MATRIX RAIN CANVAS ---
+        const canvas = document.getElementById('matrix');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$#@%&*+-/<>:=';
+        const fontSize = 14;
+        let columns = Math.floor(canvas.width / fontSize);
+        let drops = Array(columns).fill(1);
+
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(3, 5, 3, 0.08)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#00ff41';
+            ctx.font = fontSize + 'px monospace';
+
+            for (let i = 0; i < drops.length; i++) {
+                const text = chars.charAt(Math.floor(Math.random() * chars.length));
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+        setInterval(drawMatrix, 33);
+
+        // --- TRACKER CLEANER LOGIC ---
+        const BLOCKED_PARAMS = new Set([
+            // Google
+            'sxsrf', 'ei', 'oq', 'ved', 'uact', 'sclient', 'sourceid', 'cshid', 'biw', 'bih', 'dpr', 
+            'client', 'gws_rd', 'gs_lcp', 'sxsrf', 'gclid', 'gbraid', 'wbraid', 'gaa_at', 'gaa_n',
+            // UTM & Marketing
+            'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'utm_id', 'utm_reader',
+            // Facebook / Meta / Instagram / WhatsApp
+            'fbclid', 'igshid', 'fb_action_ids', 'fb_comment_id', 'wtsid',
+            // Twitter / X / TikTok
+            'twclid', 'ttcls', 't', 's',
+            // Amazon / E-Commerce
+            'tag', 'linkCode', 'creativeASIN', 'ascsubtag', 'ref_', 'pf_rd_r', 'pf_rd_p', 'pd_rd_w', 'pd_rd_r',
+            // Microsoft / Yandex / Yahoo
+            'msclkid', 'yclid', 'ysclid',
+            // Generic Tracking
+            '_hsenc', '_openstat', 'mc_cid', 'mc_eid', 'yclid', 'mkevt', 'mkcid', 'siteid'
+        ]);
+
+        function sanitizeUrl(inputUrl) {
+            let target = inputUrl.trim();
+            if (!target) return null;
+
+            // Auto-fix missing protocol
+            if (!/^https?:\/\//i.test(target)) {
+                target = 'https://' + target;
+            }
+
+            try {
+                let urlObj = new URL(target);
+
+                // Check for redirect wrappers (e.g. google.com/url?q=https://...)
+                if (urlObj.hostname.includes('google.') && urlObj.pathname === '/url' && urlObj.searchParams.has('q')) {
+                    const extracted = urlObj.searchParams.get('q');
+                    if (extracted && /^https?:\/\//i.test(extracted)) {
+                        urlObj = new URL(extracted);
+                    }
+                }
+
+                const removedTrackers = [];
+                const keysToRemove = [];
+
+                // Filter search parameters
+                urlObj.searchParams.forEach((value, key) => {
+                    const lowerKey = key.toLowerCase();
+                    if (BLOCKED_PARAMS.has(lowerKey) || lowerKey.startsWith('utm_') || lowerKey.startsWith('pk_')) {
+                        keysToRemove.push(key);
+                        removedTrackers.push(`${key}=${value.length > 20 ? value.substring(0, 20) + '...' : value}`);
+                    }
+                });
+
+                keysToRemove.forEach(k => urlObj.searchParams.delete(k));
+
+                return {
+                    clean: urlObj.toString(),
+                    removed: removedTrackers
+                };
+            } catch (e) {
+                console.error("URL Parsing failed:", e);
+                return null;
+            }
+        }
+
+        // --- DOM CONTROLE & EVENTS ---
+        const rawUrlInput = document.getElementById('rawUrl');
+        const cleanBtn = document.getElementById('cleanBtn');
+        const outputContainer = document.getElementById('outputContainer');
+        const cleanUrlInput = document.getElementById('cleanUrl');
+        const trackerBadge = document.getElementById('trackerBadge');
+        const removedLogContainer = document.getElementById('removedLogContainer');
+        const removedLog = document.getElementById('removedLog');
+        const copyBtn = document.getElementById('copyBtn');
+        const openBtn = document.getElementById('openBtn');
+        const historyList = document.getElementById('historyList');
+        const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+
+        let history = JSON.parse(localStorage.getItem('sanitizer_history') || '[]');
+
+        function updateHistoryUI() {
+            if (history.length === 0) {
+                historyList.innerHTML = '<div class="text-emerald-800 italic">No previous logs stored.</div>';
+                return;
+            }
+            historyList.innerHTML = history.map((item, idx) => `
+                <div class="flex justify-between items-center bg-black/80 border border-emerald-950 p-2 text-xs">
+                    <span class="truncate max-w-[80%] text-emerald-400 font-mono">${item}</span>
+                    <button onclick="copyToClipboard('${item}')" class="text-emerald-600 hover:text-emerald-300">COPY</button>
+                </div>
+            `).join('');
+        }
+
+        function executeSanitization() {
+            const raw = rawUrlInput.value;
+            const res = sanitizeUrl(raw);
+
+            if (!res) {
+                alert('ERROR: Invalid URL string passed.');
+                return;
+            }
+
+            cleanUrlInput.value = res.clean;
+            openBtn.href = res.clean;
+            trackerBadge.innerText = `${res.removed.length} TRACKER(S) REMOVED`;
+
+            if (res.removed.length > 0) {
+                removedLog.innerHTML = res.removed.map(t => `
+                    <span class="bg-red-950/60 border border-red-800 text-red-400 px-2 py-0.5 rounded-none font-mono">${t}</span>
+                `).join('');
+                removedLogContainer.classList.remove('hidden');
+            } else {
+                removedLogContainer.classList.add('hidden');
+            }
+
+            outputContainer.classList.remove('hidden');
+
+            // Save to history
+            if (!history.includes(res.clean)) {
+                history.unshift(res.clean);
+                if (history.length > 10) history.pop();
+                localStorage.setItem('sanitizer_history', JSON.stringify(history));
+                updateHistoryUI();
+            }
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const orig = copyBtn.innerText;
+                copyBtn.innerText = 'COPIED!';
+                setTimeout(() => copyBtn.innerText = orig, 1500);
+            });
+        }
+
+        cleanBtn.addEventListener('click', executeSanitization);
+        rawUrlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') executeSanitization();
+        });
+
+        copyBtn.addEventListener('click', () => copyToClipboard(cleanUrlInput.value));
+
+        clearHistoryBtn.addEventListener('click', () => {
+            history = [];
+            localStorage.removeItem('sanitizer_history');
+            updateHistoryUI();
+        });
+
+        // Initial UI load
+        updateHistoryUI();
+    </script>
+</body>
+</html>
